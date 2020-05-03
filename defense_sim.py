@@ -14,6 +14,7 @@ VIEWPORT_H = 600
 FPS = 50
 INITIAL_RANDOM = 1000.0   # Set 1500 to make game harder
 SPEED_MULT = 10
+MAX_TIME = 10 * FPS
 
 
 class DefensePractice(gym.Env, EzPickle):
@@ -60,16 +61,16 @@ class DefensePractice(gym.Env, EzPickle):
         H = VIEWPORT_H/SCALE
         
         self.red_bot = self.world.CreateDynamicBody(
-            position=(W/2, H/2),
+            position=(W/3, H/2),
             angle=0.0,
             fixtures = fixtureDef(
                 shape=polygonShape(box=(1,1)),
                 density=10.0))
         self.red_bot.color1 = (0.9, 0.4, 0.5)
         self.red_bot.color2 = (0.5, 0.3, 0.3)
-
+        
         self.blue_bot = self.world.CreateDynamicBody(
-            position=(W/2, H/2),
+            position=(W*2/3, H/2),
             angle=0.0,
             fixtures = fixtureDef(
                 shape=polygonShape(box=(1,1)),
@@ -79,21 +80,71 @@ class DefensePractice(gym.Env, EzPickle):
 
         self.drawlist = [self.red_bot, self.blue_bot]
 
-        return self.step(np.array([0, 0]))[0]
+        return self.step(np.array([0, 0, 0, 0]))[0]
 
     def step(self, action):
         action = np.clip(action, -1, +1)*SPEED_MULT
 
         # Move object at set velocity: https://www.iforce2d.net/b2dtut/constant-speed
-        linearVelocityAdjustment = (action[:2]-self.red_bot.linearVelocity)*self.red_bot.mass
+
+        # Update Red Robot
+        angularVelocityAdjustment = (action[1]-self.red_bot.angularVelocity)*self.red_bot.mass
+        self.red_bot.ApplyAngularImpulse(angularVelocityAdjustment, True)
+
+        baseVelocity = np.array([math.cos(self.red_bot.angle),math.sin(self.red_bot.angle)])*action[0]
+
+        linearVelocityAdjustment = (baseVelocity-self.red_bot.linearVelocity)*self.red_bot.mass
         self.red_bot.ApplyLinearImpulse(linearVelocityAdjustment, (self.red_bot.position[0], self.red_bot.position[1]), True)
 
-        linearVelocityAdjustment = (action[-2:]-self.blue_bot.linearVelocity)*self.blue_bot.mass
+        # Update Blue Robot
+        angularVelocityAdjustment = (action[3]-self.blue_bot.angularVelocity)*self.blue_bot.mass
+        self.blue_bot.ApplyAngularImpulse(angularVelocityAdjustment, True)
+
+        baseVelocity = np.array([math.cos(self.blue_bot.angle),math.sin(self.blue_bot.angle)])*action[2]
+
+        linearVelocityAdjustment = (baseVelocity-self.blue_bot.linearVelocity)*self.blue_bot.mass
         self.blue_bot.ApplyLinearImpulse(linearVelocityAdjustment, (self.blue_bot.position[0], self.blue_bot.position[1]), True)
 
         self.world.Step(1.0/FPS, 6*30, 2*30)
 
-        return np.array([0,0,0,0,0,0,0,0], dtype=np.float32), 0, False, {}
+        done = False
+        if not 0 < self.red_bot.position[0] < VIEWPORT_W/SCALE:
+            done = True
+        if not 0 < self.red_bot.position[1] < VIEWPORT_H/SCALE:
+            done = True
+        if not 0 < self.blue_bot.position[0] < VIEWPORT_W/SCALE:
+            done = True
+        if not 0 < self.blue_bot.position[1] < VIEWPORT_H/SCALE:
+            done = True
+        
+        red_pos_normalized = self.red_bot.position/(VIEWPORT_W/SCALE)
+        red_linVel_normalized = self.red_bot.linearVelocity/SPEED_MULT
+        red_state = np.array([
+            red_pos_normalized[0],
+            red_pos_normalized[1],
+            self.red_bot.angle,
+            red_linVel_normalized[0],
+            red_linVel_normalized[1]
+        ])
+
+        blue_pos_normalized = self.blue_bot.position/(VIEWPORT_W/SCALE)
+        blue_linVel_normalized = self.blue_bot.linearVelocity/SPEED_MULT
+        blue_state = np.array([
+            blue_pos_normalized[0],
+            blue_pos_normalized[1],
+            self.blue_bot.angle,
+            blue_linVel_normalized[0],
+            blue_linVel_normalized[1]
+        ])
+
+        red_reward = (self.red_bot.position[0]+self.blue_bot.position[0])/2
+        blue_reward = VIEWPORT_W/SCALE - red_reward
+        #if not done:
+        #    print(red_state)
+        #    print(red_reward, blue_reward)
+        #    print(self.red_bot.position, self.blue_bot.position)
+
+        return np.concatenate([red_state,blue_state]), red_reward, np.concatenate([blue_state,red_state]), blue_reward, done, {}
     
     def render(self, mode='human'):
         from gym.envs.classic_control import rendering
@@ -124,8 +175,8 @@ class DefensePractice(gym.Env, EzPickle):
 if __name__ == "__main__":
     env = DefensePractice()
     env.reset()
-    for _ in range(10000):
+    for _ in range(MAX_TIME):
         env.render()
-        env.step([-1,-0.5,0,0])
-        #env.step(env.action_space.sample()) # take a random action
+        #env.step([1,0,0,0])
+        env.step(env.action_space.sample()) # take a random action
     env.close()
