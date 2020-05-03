@@ -2,7 +2,7 @@
 from IPython import get_ipython
 
 # %% [markdown]
-# # MountainCarContinuous-v0
+# # DefensePractice-v0
 # ---
 # In this notebook, you will implement a DDPG agent with OpenAI Gym's MountainCarContinuous-v0 environment.
 # 
@@ -37,7 +37,11 @@ from defense_environment import DefensePractice
 # Initialize the environment in the code cell below.
 
 # %%
-random_seed = 2
+random_seed = 7
+
+# points to win
+win_points = 1000
+print('Red or Blue need a score of {} to win'.format(win_points))
 
 #env = gym.make('MountainCarContinuous-v0')
 env = DefensePractice()
@@ -78,40 +82,61 @@ def save_model():
 
 # %%
 def ddpg(n_episodes=100000, max_t=1500, print_every=1, save_every=20):
-    scores_deque = deque(maxlen=print_every)
-    scores = []
+    red_scores_deque = deque(maxlen=print_every)
+    red_scores = []
+    
+    blue_scores_deque = deque(maxlen=print_every)
+    blue_scores = []
     
     for i_episode in range(1, n_episodes+1):
         state = env.reset()
+        red_state = state[0]
+        blue_state = state[2]
         agent.reset()
-        score = 0
+        red_score = 0
+        blue_score = 0
         timestep = time.time()
         for t in range(max_t):
-            action = agent.act(state)
+            blue_action = agent.act(blue_state)
+            red_action = agent.act(red_state)
             env.render()
-            next_state, reward, done, _ = env.step(action)
-            agent.step(state, action, reward, next_state, done, t)
-            score += reward
-            state = next_state            
+            next_red_state, red_reward, next_blue_state, blue_reward, done, _ = env.step(np.concatenate([red_action, blue_action]))
+            agent.step(blue_state, blue_action, blue_reward, next_blue_state, done, t)
+            agent.step(red_state, red_action, red_reward, next_red_state, done, t)
+            red_score += red_reward
+            blue_score += blue_reward
+            red_state = next_red_state
+            blue_state = next_blue_state
             if done:
                 break 
                 
-        scores_deque.append(score)
-        scores.append(score)
-        score_average = np.mean(scores_deque)
+        red_scores_deque.append(red_score)
+        red_scores.append(red_score)
+        red_score_average = np.mean(red_scores_deque)
+
+        blue_scores_deque.append(blue_score)
+        blue_scores.append(blue_score)
+        blue_score_average = np.mean(blue_scores_deque)
         
         if i_episode % save_every == 0:
             save_model()
         
         if i_episode % print_every == 0:
-            print('\rEpisode {}, Average Score: {:.2f}, Max: {:.2f}, Min: {:.2f}, Time: {:.2f}'                  .format(i_episode, score_average, np.max(scores), np.min(scores), time.time() - timestep), end="\n")
+            print('\r[RED]  Episode {}, Average Score: {:.2f}, Max: {:.2f}, Min: {:.2f}, Time: {:.2f}'.format(i_episode, red_score_average, np.max(red_scores), np.min(red_scores), time.time() - timestep), end="\n")
                     
-        if np.mean(scores_deque) >= 300:            
+        if np.mean(red_scores_deque) >= win_points:            
             save_model()
-            print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode, score_average))            
+            print('Red won in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode, red_score_average))            
+            break       
+
+        if i_episode % print_every == 0:
+            print('\r[BLUE] Episode {}, Average Score: {:.2f}, Max: {:.2f}, Min: {:.2f}, Time: {:.2f}'.format(i_episode, blue_score_average, np.max(blue_scores), np.min(blue_scores), time.time() - timestep), end="\n")
+                    
+        if np.mean(blue_scores_deque) >= win_points:            
+            save_model()
+            print('Blue won in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode, blue_score_average))            
             break            
-            
-            
+    
     return scores
 
 scores = ddpg()
@@ -122,6 +147,9 @@ plt.plot(np.arange(1, len(scores)+1), scores)
 plt.ylabel('Score')
 plt.xlabel('Episode #')
 plt.show()
+
+#%%
+env.close()
 
 # %% [markdown]
 # ### 4. Watch a Smart Agent!
@@ -134,10 +162,13 @@ agent.critic_local.load_state_dict(torch.load('checkpoint_critic.pth'))
 
 for _ in range(5):
     state = env.reset()
+    red_state = state[0]
+    blue_state = state[2]
     for t in range(1200):
-        action = agent.act(state, add_noise=False)
+        red_action = agent.act(red_state)
+        blue_action = agent.act(blue_state)
         env.render()
-        state, reward, done, _ = env.step(action)
+        red_state, red_reward, blue_state, blue_reward, done, _ = env.step(np.concatenate([red_action, blue_action]))
         if done:
             break 
 
