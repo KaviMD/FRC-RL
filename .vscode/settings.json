@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "C:\\Users\\LionHeart\\Anaconda2\\envs\\FRC-RL\\python.exe"
+    "python.pythonPath": "C:\\Users\\LionHeart\\Anaconda2\\envs\\FRC-RL\\python.exe",
+    "python.dataScience.jupyterServerURI": "local"
 }
