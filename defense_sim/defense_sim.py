@@ -40,7 +40,7 @@ from defense_environment import DefensePractice
 random_seed = 7
 
 # points to win
-win_points = 1000
+win_points = 10000
 print('Red or Blue need a score of {} to win'.format(win_points))
 
 #env = gym.make('MountainCarContinuous-v0')
@@ -48,8 +48,8 @@ env = DefensePractice()
 env.seed(random_seed)
 
 # size of each action
-action_size = env.action_space.shape[0]
-print('Size of each action:', action_size)
+action_size = int(env.action_space.shape[0]/2)
+print('Size of each action:', action_size, "* NUM_ROBOTS")
 
 # examine the state space 
 state_size = env.observation_space.shape[0]
@@ -97,16 +97,25 @@ def ddpg(n_episodes=100000, max_t=1500, print_every=1, save_every=20):
         blue_score = 0
         timestep = time.time()
         for t in range(max_t):
-            blue_action = agent.act(blue_state)
             red_action = agent.act(red_state)
-            env.render()
-            next_red_state, red_reward, next_blue_state, blue_reward, done, _ = env.step(np.concatenate([red_action, blue_action]))
-            agent.step(blue_state, blue_action, blue_reward, next_blue_state, done, t)
+            #blue_action = agent.act(blue_state)
+            blue_action = [0,0]
+
+            action = np.concatenate([red_action, blue_action])
+
+            #env.render()
+
+            next_red_state, red_reward, next_blue_state, blue_reward, done, _ = env.step(action)
+
             agent.step(red_state, red_action, red_reward, next_red_state, done, t)
+            #agent.step(blue_state, blue_action, blue_reward, next_blue_state, done, t)
+
             red_score += red_reward
-            blue_score += blue_reward
             red_state = next_red_state
+
+            blue_score += blue_reward
             blue_state = next_blue_state
+
             if done:
                 break 
                 
@@ -135,18 +144,20 @@ def ddpg(n_episodes=100000, max_t=1500, print_every=1, save_every=20):
         if np.mean(blue_scores_deque) >= win_points:            
             save_model()
             print('Blue won in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode, blue_score_average))            
-            break            
+            break
     
-    return scores
+    return red_scores, blue_scores
 
-scores = ddpg()
+red_scores,blue_scores = ddpg(max_t=600)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-plt.plot(np.arange(1, len(scores)+1), scores)
+plt.plot(np.arange(1, len(red_scores)+1), red_scores, color='red')
+plt.plot(np.arange(1, len(blue_scores)+1), blue_scores, color='blue')
 plt.ylabel('Score')
 plt.xlabel('Episode #')
 plt.show()
+env.close()
 
 #%%
 env.close()
@@ -166,9 +177,11 @@ for _ in range(5):
     blue_state = state[2]
     for t in range(1200):
         red_action = agent.act(red_state)
+        print(red_action)
         blue_action = agent.act(blue_state)
+        action = np.concatenate([red_action, blue_action])
         env.render()
-        red_state, red_reward, blue_state, blue_reward, done, _ = env.step(np.concatenate([red_action, blue_action]))
+        red_state, red_reward, blue_state, blue_reward, done, _ = env.step(action)
         if done:
             break 
 
