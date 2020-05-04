@@ -40,7 +40,7 @@ from defense_environment import DefensePractice
 random_seed = 7
 
 # points to win
-win_points = 10000
+win_points = 200
 print('Red or Blue need a score of {} to win'.format(win_points))
 
 #env = gym.make('MountainCarContinuous-v0')
@@ -106,6 +106,7 @@ def ddpg(n_episodes=100000, max_t=1500, print_every=1, save_every=20):
             #env.render()
 
             next_red_state, red_reward, next_blue_state, blue_reward, done, _ = env.step(action)
+            #print("out", red_action, red_reward)
 
             agent.step(red_state, red_action, red_reward, next_red_state, done, t)
             #agent.step(blue_state, blue_action, blue_reward, next_blue_state, done, t)
@@ -171,20 +172,22 @@ env.close()
 agent.actor_local.load_state_dict(torch.load('checkpoint_actor.pth'))
 agent.critic_local.load_state_dict(torch.load('checkpoint_critic.pth'))
 
-for _ in range(5):
+for _ in range(1):
     state = env.reset()
     red_state = state[0]
     blue_state = state[2]
+    red_score = 0
     for t in range(1200):
         red_action = agent.act(red_state)
-        print(red_action)
         blue_action = agent.act(blue_state)
         action = np.concatenate([red_action, blue_action])
         env.render()
         red_state, red_reward, blue_state, blue_reward, done, _ = env.step(action)
+        red_score += red_reward
+        print(red_action, red_reward)
         if done:
             break 
-
+    print(red_score)
 env.close()
 
 

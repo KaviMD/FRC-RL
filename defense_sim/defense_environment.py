@@ -161,8 +161,8 @@ class DefensePractice(gym.Env, EzPickle):
         # blue_reward = blue_reward - self.time_penalty - (abs(blue_action[1])/BLUE_SPEED_MULT)*turn_penalty
         
         blue_reward = 0
-        print(red_action)
-        red_reward = abs(red_action[0]) - abs(red_action[1])
+        red_reward = abs(red_action[0]) - abs(red_action[1])*1.5
+        #print("in ", red_action, red_reward)
 
         # print(red_state)
         # print(red_action/RED_SPEED_MULT, blue_action/RED_SPEED_MULT)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     env.reset()
     for _ in range(MAX_TIME):
         env.render()
-        done = env.step([1,1,1,0])[4]
+        done = env.step([1,0,1,0])[4]
         # done = env.step([0,0,0,0])[4]
         # done = env.step(env.action_space.sample())[4] # take a random action
         if done:
